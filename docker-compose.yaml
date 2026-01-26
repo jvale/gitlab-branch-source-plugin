@@ -1,0 +1,115 @@
+# We intentionally do not set any specific version for the compose manifest,
+# as doing so now is only required for opting-out of BuildKit by using
+# the legacy schema version, as further explained by:
+#
+#   - https://farfetch.atlassian.net/wiki/spaces/DeliveryPlatform/pages/13631553621/Composition+Orchestration
+#   - https://farfetch.atlassian.net/wiki/spaces/DeliveryPlatform/pages/13631848477/Get+updates+without+upgrading+Docker
+#
+services:
+  base:
+    image: ${ARTIFACT_NAME}-java:base
+    build:
+      context: .
+#
+# using cache_from the base image will reduce build time, as Docker
+# will leverage the private registry caching capabilities, and fetch only
+# any changed layers instead of pulling the complete artifact on every build
+#
+      cache_from:
+        - "type=registry,ref=${FROM_REPO_JAVA_JDK}:${FROM_TAG_JAVA_JDK}"
+        - "type=registry,ref=${FROM_REPO_JAVA_MAVEN}:${FROM_TAG_JAVA_MAVEN}"
+      target: base
+#
+# Here we mount the secrets that are declared in the bottom
+# so we leverage buildKit's secret mount to avoid leaking
+# secrets as part of the final artifact,
+# check the following for further instructions
+#
+#   - https://farfetch.atlassian.net/wiki/spaces/DeliveryPlatform/pages/13631815990/Handling+Build+Secrets
+#
+      secrets:
+        - art_creds_username
+        - art_creds_token
+      dockerfile: ./Dockerfile
+      args:
+        FFUSER_UID: ${FFUSER_UID}
+        FROM_REPO_JDK: ${FROM_REPO_JAVA_JDK}
+        FROM_REPO_JRE: ${FROM_REPO_JAVA_JRE}
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_JDK: ${FROM_TAG_JAVA_JDK}
+        FROM_TAG_JRE: ${FROM_TAG_JAVA_JRE}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_URL: ${REGISTRY_URL}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+    environment:
+      - DOCKER_BUILDKIT=1
+      - COMPOSE_DOCKER_CLI_BUILD=1
+
+
+  unit-tests:
+    image: ${ARTIFACT_NAME}-java:tests
+    build:
+      context: .
+#
+# using cache_from the previous stage, will speed even more your build
+# as all dependencies that were already downloaded in the first step
+# will be mounted in runtime by Docker instead of having to download it again
+#
+      cache_from:
+        - "base"
+      target: unit-tests
+      secrets:
+        - art_creds_username
+        - art_creds_token
+      dockerfile: ./Dockerfile
+      args:
+        FFUSER_UID: ${FFUSER_UID}
+        FROM_REPO_JDK: ${FROM_REPO_JAVA_JDK}
+        FROM_REPO_JRE: ${FROM_REPO_JAVA_JRE}
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_JDK: ${FROM_TAG_JAVA_JDK}
+        FROM_TAG_JRE: ${FROM_TAG_JAVA_JRE}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_URL: ${REGISTRY_URL}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+    environment:
+      - DOCKER_BUILDKIT=1
+      - COMPOSE_DOCKER_CLI_BUILD=1
+
+
+#
+# CI shared library will extract any package that needs publishing from
+# any packages:latest generated during pipeline runtime
+#
+# Note however that this image does not need to be published, only builded!
+# check this example Dockerfile for more details
+#
+  packages:
+    image: packages:latest
+    build:
+      context: .
+      target: packages
+      dockerfile: ./Dockerfile
+      secrets:
+        - art_creds_username
+        - art_creds_token
+      args:
+        FFUSER_UID: ${FFUSER_UID}
+        FROM_REPO_JDK: ${FROM_REPO_JAVA_JDK}
+        FROM_REPO_JRE: ${FROM_REPO_JAVA_JRE}
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_JDK: ${FROM_TAG_JAVA_JDK}
+        FROM_TAG_JRE: ${FROM_TAG_JAVA_JRE}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_URL: ${REGISTRY_URL}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+
+#
+# Here we indicate the path for the secrets that will be generated
+# during build stage, so we pass it as mounted secrets
+#
+secrets:
+  art_creds_username:
+    file: ../../.pipeline/.art_creds_username
+  art_creds_token:
+    file: ../../.pipeline/.art_creds_token

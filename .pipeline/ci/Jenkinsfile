@@ -1,0 +1,44 @@
+pipeline {
+    agent none
+
+    environment {
+        MAJOR = 739
+        MINOR = 'v9999'
+        PATCH = "${sh(script: "date +%y%j | tr -d '\n'", returnStdout: true)}"
+        VERSION_CORE = "${MAJOR}.${MINOR}.${PATCH}"
+        PRE_RELEASE_VERSION = "${VERSION_CORE}-beta-${env.BUILD_ID}"
+        BUILD_VERSION = "${VERSION_CORE}-${env.BUILD_ID}"
+        RELEASE_VERSION = "${env.BRANCH_NAME == "master" ? env.BUILD_VERSION : env.PRE_RELEASE_VERSION}"
+        ARTIFACT_NAME = "${env.BLUEPRINT_PLATFORM}-${env.BLUEPRINT_BOUNDARY}-${env.BLUEPRINT_NAME}"
+        TAG = "${env.RELEASE_VERSION}"
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script{
+                    currentBuild.displayName = "# ${RELEASE_VERSION} | ${env.BRANCH_NAME}"
+                    currentBuild.description = "# ${env.BUILD_ID} | ${env.BRANCH_NAME}"
+                }
+
+                echo "Release Version: ${RELEASE_VERSION}"
+
+                sh 'make build'
+
+                // script {
+                //     Release.addArtifacts([
+                //         ["type": "docker", "source": "${ARTIFACT_NAME}:${TAG}"],
+                //     ])
+
+                //     Release.setReleaseVersion("${RELEASE_VERSION}")
+                // }
+            }
+        }
+
+        stage('Unit Test') {
+            steps {
+               sh 'make unit-test'
+            }
+        }
+    }
+}
