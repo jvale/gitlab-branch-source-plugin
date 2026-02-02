@@ -1,0 +1,55 @@
+services:
+  base:
+    image: ${ARTIFACT_NAME}:base
+    build:
+      context: .
+      target: build
+      dockerfile: ./Dockerfile
+      args:
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_USERNAME: ${REGISTRY_USERNAME}
+        REGISTRY_API_KEY: ${REGISTRY_API_KEY}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+    environment:
+      - DOCKER_BUILDKIT=1
+      - COMPOSE_DOCKER_CLI_BUILD=1
+
+
+  unit-tests:
+    image: ${ARTIFACT_NAME}:tests
+    build:
+      context: .
+      target: unit-tests
+      dockerfile: ./Dockerfile
+      args:
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_USERNAME: ${REGISTRY_USERNAME}
+        REGISTRY_API_KEY: ${REGISTRY_API_KEY}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+    environment:
+      - DOCKER_BUILDKIT=1
+      - COMPOSE_DOCKER_CLI_BUILD=1
+
+
+  #
+  # CI shared library will extract any package that needs publishing from
+  # any packages:latest generated during pipeline runtime
+  #
+  # Note however that this image does not need to be published, only builded!
+  # check this example Dockerfile for more details
+  #
+  packages:
+    image: packages:latest
+    build:
+      context: .
+      target: packages
+      dockerfile: ./Dockerfile
+      args:
+        ARTIFACT_NAME: ${ARTIFACT_NAME}
+        FROM_REPO_MAVEN: ${FROM_REPO_JAVA_MAVEN}
+        FROM_TAG_MAVEN: ${FROM_TAG_JAVA_MAVEN}
+        REGISTRY_USERNAME: ${REGISTRY_USERNAME}
+        REGISTRY_API_KEY: ${REGISTRY_API_KEY}
+        RELEASE_VERSION: ${RELEASE_VERSION}

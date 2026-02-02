@@ -1,0 +1,42 @@
+pipeline {
+    agent none
+
+    environment {
+        RELEASE_VERSION = "${sh(script: 'make get-release-tag', returnStdout: true)}"
+        ARTIFACT_NAME="gitlab-branch-source"
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script{
+                    currentBuild.displayName = "# ${RELEASE_VERSION} | ${env.BRANCH_NAME}"
+                    currentBuild.description = "# ${env.BUILD_ID} | ${env.BRANCH_NAME}"
+                }
+
+                echo "Version: ${RELEASE_VERSION}"
+
+                sh 'make build'
+                sh 'make packages'
+
+                script {
+                    Release.addArtifacts([
+                        [
+                            'type':       "maven",
+                            'sourceType': "desc",
+                            'source':     "${ARTIFACT_NAME}-${RELEASE_VERSION}.hpi"
+                        ]
+                    ])
+
+                    Release.setReleaseVersion("${RELEASE_VERSION}")
+                }
+            }
+        }
+
+        stage('Unit Test') {
+            steps {
+               sh 'make unit-tests'
+            }
+        }
+    }
+}
